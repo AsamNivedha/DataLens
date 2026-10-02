@@ -491,4 +491,69 @@ def step_export(raw: pd.DataFrame, df: pd.DataFrame) -> None:
 
     st.subheader("Findings")
     st.download_button("Download insights (TXT)", ins.insights_to_text(sections, name).encode("utf-8"),
+                       file_name="datalens_insights.txt", mime="text/plain", key="dl_insights")
+    st.download_button("Download full analysis report (TXT)", build_report(raw, df, sections).encode("utf-8"),
+                       file_name="datalens_report.txt", mime="text/plain", key="dl_report")
+    st.caption("Individual charts also have their own PNG download buttons under each chart.")
+
+
+SECTIONS = {
+    "Overview": step_overview,
+    "Explore": step_explore,
+    "Analyze": step_analyze,
+    "Discover": step_discover,
+    "Export": step_export,
+}
+
+
+# ------------------------------------------------------------------------ main
+def sidebar_controls(raw: pd.DataFrame) -> pd.DataFrame:
+    sidebar_label("DATASET")
+    st.sidebar.caption(st.session_state.get("source_name", "Dataset"))
+    with st.sidebar.expander("Replace dataset"):
+        uploaded = st.file_uploader("Upload CSV", type=["csv"], key="uploader_sidebar",
+                                    label_visibility="collapsed")
+        if uploaded is not None:
+            handle_upload(uploaded)
+        st.button("Use sample data", on_click=use_sample, key="sidebar_sample")
+
+    sidebar_label("FILTER DATA")
+    selections = {}
+    for col in an.filterable_columns(raw)[:5]:
+        options = sorted(raw[col].dropna().unique(), key=str)
+        selections[col] = st.sidebar.multiselect(an.pretty(col), options, key=f"filter_{col}")
+    search = st.sidebar.text_input("Search records", key="search_text")
+    filtered = an.apply_filters(raw, selections, search)
+    st.sidebar.caption(f"Showing {len(filtered):,} of {len(raw):,} rows")
+    st.sidebar.button("Reset filters", on_click=reset_filters)
+    return filtered
+
+
+def main() -> None:
+    raw = st.session_state.get("df")
+    if raw is None:
+        page_landing()
+        return
+
+    filtered = sidebar_controls(raw)
+    dataset_header(raw, filtered)
+    error = st.session_state.pop("load_error", None)
+    if error:
+        st.error(error)
+
+    st.session_state.setdefault("step", STEPS[0])
+    st.radio("Journey", STEPS, key="step", horizontal=True, label_visibility="collapsed")
+    st.write("")
+
+    if filtered.empty:
+        st.warning("No records match the current filters. Adjust or reset them in the sidebar.")
+        return
+    SECTIONS[st.session_state["step"]](raw, filtered)
+
+
+try:
+    main()
+except Exception as exc:  # show the problem instead of a blank page
+    st.error("Something went wrong while building this page. Details are below.")
+    st.exception(exc)
                    
