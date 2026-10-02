@@ -6,5 +6,11 @@ secondaryBackgroundColor = "#F4F6FA"
 textColor = "#1F2933"
 font = "sans serif"
 
+[client]
+toolbarMode = "minimal"
+
 [server]
 maxUploadSize = 50
+
+[browser]
+gatherUsageStats = false
